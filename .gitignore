@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+env/
+.env
+
+# Large raw & generated data files (too big for GitHub)
+jan_to_may_police_violation_anonymized.csv
+parking_clustered.csv
+parking_clean.csv
+
+# Generated HTML (large)
+parking_heatmap.html
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
