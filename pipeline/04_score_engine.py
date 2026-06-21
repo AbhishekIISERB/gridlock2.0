@@ -11,14 +11,20 @@ from datetime import datetime, timezone
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db', 'gridlock.db')
 
+# V4 score weights — tuned based on operational priority:
+# c_impact (total severity), c_lanes (traffic blockage) are the clearest proxy
+# for actual traffic disruption. c_consistency (active_days) + c_persistence (active_weeks)
+# determine chronic vs. one-off offenders. c_peak distinguishes rush-hour clusters.
+# c_official and c_compound carry very little signal (only 4 cops + compound events)
+# and have been redistributed to impact/lanes.
 V4_WEIGHTS = {
-    'c_impact':      0.20,
-    'c_lanes':       0.25,
-    'c_peak':        0.15,
-    'c_consistency': 0.25,
-    'c_persistence': 0.10,
-    'c_official':    0.04,
-    'c_compound':    0.01,
+    'c_impact':      0.28,  # was 0.20 — severity of each violation is the clearest proxy
+    'c_lanes':       0.28,  # was 0.25 — lanes blocked = direct traffic disruption
+    'c_peak':        0.18,  # was 0.15 — rush-hour offenders need priority enforcement
+    'c_consistency': 0.20,  # was 0.25 — chronic zones (slightly down to give room to severity)
+    'c_persistence': 0.05,  # was 0.10 — weeks-active matters but less than daily rate
+    'c_official':    0.01,  # was 0.04 — very sparse signal (~4 approved violations)
+    'c_compound':    0.00,  # was 0.01 — literally 0 variance; removed from scoring
 }
 
 parser = argparse.ArgumentParser()
@@ -39,9 +45,10 @@ def risk_tier(score: float) -> str:
 
 
 def shift_label(peak_pct: float) -> str:
-    if peak_pct > 0.85: return 'Late night (11pm–4am)'
-    if peak_pct > 0.60: return 'Evening + night (7pm–midnight)'
-    return 'Mixed / daytime'
+    # This dataset: 56.5% of violations happen 10pm-4am; is_peak = 0-6am + 7pm-11pm
+    if peak_pct > 0.75: return 'Late night / early morning (7pm–6am)'
+    if peak_pct > 0.40: return 'Evening + night (7pm–midnight)'
+    return 'Daytime (6am–7pm)'
 
 
 def run_score_engine(window_days: int = 30, conn=None) -> pd.DataFrame:
@@ -120,6 +127,9 @@ def run_score_engine(window_days: int = 30, conn=None) -> pd.DataFrame:
         'daily_rate', 'blockage_pct', 'enforcement_shift',
     ]
     agg[out_cols].to_sql('cluster_scores', conn, if_exists='append', index=False)
+    
+    # Clean up old scores to prevent DB bloat (keep last 6 hours of history for charts)
+    conn.execute("DELETE FROM cluster_scores WHERE recalculated_at < datetime('now', '-6 hours')")
     conn.commit()
 
     top5 = agg.nlargest(5, 'congestion_score')[

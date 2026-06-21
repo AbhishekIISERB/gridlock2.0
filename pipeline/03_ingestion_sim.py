@@ -65,9 +65,16 @@ now_str = datetime.now(timezone.utc).isoformat()
 batch['ingested_at']      = now_str
 batch['created_datetime'] = batch['created_datetime'].astype(str)
 
-# Insert into DB (ignore duplicates on id)
-batch.to_sql('violations', conn, if_exists='append', index=False,
-             method='multi')
+# Insert with OR IGNORE so seeded rows don't crash on duplicate id
+records = batch.to_dict(orient='records')
+cols    = list(batch.columns)
+placeholders = ', '.join(['?'] * len(cols))
+col_names    = ', '.join(cols)
+conn.executemany(
+    f"INSERT OR IGNORE INTO violations ({col_names}) VALUES ({placeholders})",
+    [tuple(r[c] for c in cols) for r in records]
+)
+inserted_count = conn.execute("SELECT changes()").fetchone()[0]
 
 new_last_dt    = batch['created_datetime'].max()
 new_total      = total_so_far + len(batch)

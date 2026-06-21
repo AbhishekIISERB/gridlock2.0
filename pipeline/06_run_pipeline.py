@@ -23,6 +23,9 @@ if args.demo_speed:
     args.batch_size = 5000
     args.tick_sec   = 10
 
+# Clear sys.argv so imported modules don't crash trying to parse orchestrator args
+sys.argv = [sys.argv[0]]
+
 # Add pipeline dir to path so we can import score/alert functions
 sys.path.insert(0, PIPELINE_DIR)
 from importlib.util import spec_from_file_location, module_from_spec
@@ -36,6 +39,9 @@ def _load(fname):
 
 score_mod = _load('04_score_engine.py')
 alert_mod = _load('05_alert_engine.py')
+forecast_mod = _load('07_forecast_engine.py')
+anomaly_mod = _load('08_anomaly_engine.py')
+llm_val_mod = _load('09_llm_validator.py')
 
 print("=" * 60)
 print("GRIDLOCK AI — LIVE PIPELINE ORCHESTRATOR")
@@ -81,6 +87,33 @@ while True:
         conn.close()
     except Exception as e:
         print(f"  [alert_engine] {e}")
+
+    # ── Step 4: Detect anomalies ──────────────────────────────────
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn.execute("PRAGMA journal_mode=WAL")
+        anomaly_mod.run_anomaly_engine(conn=conn)
+        conn.close()
+    except Exception as e:
+        print(f"  [anomaly_engine] {e}")
+
+    # ── Step 5: Update forecasts ──────────────────────────────────
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn.execute("PRAGMA journal_mode=WAL")
+        forecast_mod.run_forecast_engine(conn=conn, retrain=False)
+        conn.close()
+    except Exception as e:
+        print(f"  [forecast_engine] {e}")
+
+    # ── Step 6: LLM Forecast Validation ───────────────────────────
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=15)
+        conn.execute("PRAGMA journal_mode=WAL")
+        llm_val_mod.run_llm_validator(conn=conn)
+        conn.close()
+    except Exception as e:
+        print(f"  [llm_validator] {e}")
 
     print(f"  Sleeping {args.tick_sec}s ...")
     time.sleep(args.tick_sec)

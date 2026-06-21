@@ -20,21 +20,57 @@ st.set_page_config(
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'db', 'gridlock.db')
 
-# ── Custom CSS ─────────────────────────────────────────────────
+# ── Custom CSS (World-Class UI) ────────────────────────────────
 st.markdown("""
 <style>
-  [data-testid="stAppViewContainer"] { background: #0d1117; color: #e2e8f0; }
-  [data-testid="stSidebar"] { background: #161b22; }
-  .metric-card { background:#1e2530; border-radius:10px; padding:16px;
-                 border:1px solid rgba(255,255,255,0.08); margin-bottom:8px; }
-  .alert-urgent  { background:#3d1515; border-left:4px solid #ef4444;
-                   padding:10px; border-radius:6px; margin:6px 0; }
-  .alert-warning { background:#2d2215; border-left:4px solid #f97316;
-                   padding:10px; border-radius:6px; margin:6px 0; }
-  .alert-info    { background:#152030; border-left:4px solid #3b82f6;
-                   padding:10px; border-radius:6px; margin:6px 0; }
-  .alert-resolved{ background:#152520; border-left:4px solid #22c55e;
-                   padding:10px; border-radius:6px; margin:6px 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+  
+  /* Global Typography */
+  html, body, [class*="css"] {
+      font-family: 'Outfit', sans-serif;
+  }
+  
+  /* Background & Sidebar */
+  [data-testid="stAppViewContainer"] { 
+      background: radial-gradient(circle at 50% 0%, #151b2b 0%, #0a0e17 100%); 
+      color: #e2e8f0; 
+  }
+  [data-testid="stSidebar"] { 
+      background: rgba(16, 21, 31, 0.6);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  
+  /* Gradient Text */
+  .gradient-text {
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+  }
+
+  /* Alerts */
+  .alert-urgent { 
+      background: linear-gradient(135deg, rgba(127,29,29,0.8), rgba(69,10,10,0.9)); 
+      border-left: 4px solid #ef4444; padding: 12px; border-radius: 8px; margin: 8px 0;
+      box-shadow: 0 4px 15px rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.2);
+  }
+  .alert-warning { 
+      background: linear-gradient(135deg, rgba(124,45,18,0.8), rgba(67,20,7,0.9)); 
+      border-left: 4px solid #f97316; padding: 12px; border-radius: 8px; margin: 8px 0;
+      box-shadow: 0 4px 15px rgba(249,115,22,0.15); border: 1px solid rgba(249,115,22,0.2);
+  }
+  .alert-info { 
+      background: linear-gradient(135deg, rgba(30,58,138,0.8), rgba(17,24,39,0.9)); 
+      border-left: 4px solid #3b82f6; padding: 12px; border-radius: 8px; margin: 8px 0;
+      box-shadow: 0 4px 15px rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.2);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,11 +99,35 @@ def load_live_zones():
 
 @st.cache_data(ttl=30)
 def load_recent_violations(hours=24):
+    """Returns violations from the last N hours of the DB's own timeline.
+    Works whether data is freshly seeded (2023 dates) or truly live (today)."""
     conn = get_conn()
     try:
         df = pd.read_sql(f"""
             SELECT * FROM violations
-            WHERE ingested_at >= datetime('now', '-{hours} hours')
+            WHERE ingested_at >= (
+                SELECT datetime(MAX(ingested_at), '-{hours} hours')
+                FROM violations
+            )
+        """, conn)
+    finally:
+        conn.close()
+    return df
+
+@st.cache_data(ttl=30)
+def load_violations_for_heatmap(hours=24, limit=100000):
+    """All violations for heatmap (no cluster filter), filtered by hours slider.
+    Time is relative to DB's own max ingested_at so seeded data works too."""
+    conn = get_conn()
+    try:
+        df = pd.read_sql(f"""
+            SELECT latitude, longitude, impact FROM violations
+            WHERE ingested_at >= (
+                SELECT datetime(MAX(ingested_at), '-{hours} hours')
+                FROM violations
+            )
+            ORDER BY ingested_at DESC
+            LIMIT {limit}
         """, conn)
     finally:
         conn.close()
@@ -81,6 +141,37 @@ def load_unack_alerts():
             SELECT * FROM alerts WHERE acknowledged = 0
             ORDER BY triggered_at DESC LIMIT 30
         """, conn)
+    finally:
+        conn.close()
+    return df
+
+@st.cache_data(ttl=10)
+def load_unack_anomalies():
+    conn = get_conn()
+    try:
+        # Fails gracefully if table not created yet
+        df = pd.read_sql("""
+            SELECT * FROM cluster_anomalies WHERE acknowledged = 0
+            ORDER BY detected_at DESC LIMIT 30
+        """, conn)
+    except Exception:
+        df = pd.DataFrame()
+    finally:
+        conn.close()
+    return df
+
+@st.cache_data(ttl=30)
+def load_forecasts():
+    conn = get_conn()
+    try:
+        df = pd.read_sql("""
+            SELECT * FROM cluster_forecasts
+            WHERE forecast_at = (SELECT MAX(forecast_at) FROM cluster_forecasts)
+              AND hour_offset > 0
+            ORDER BY hour_offset ASC, predicted_violations DESC
+        """, conn)
+    except Exception:
+        df = pd.DataFrame()
     finally:
         conn.close()
     return df
@@ -113,6 +204,13 @@ def load_score_history(top_cluster_ids):
 def ack_alert(alert_id):
     conn = get_conn()
     conn.execute("UPDATE alerts SET acknowledged=1 WHERE id=?", (alert_id,))
+    conn.commit()
+    conn.close()
+    st.cache_data.clear()
+
+def ack_anomaly(anomaly_id):
+    conn = get_conn()
+    conn.execute("UPDATE cluster_anomalies SET acknowledged=1 WHERE id=?", (anomaly_id,))
     conn.commit()
     conn.close()
     st.cache_data.clear()
@@ -157,13 +255,40 @@ with st.sidebar:
                 ack_alert(int(a['id']))
                 st.rerun()
     else:
-        st.success("✅ No active alerts")
+        st.success("✅ No active tier alerts")
+
+    anoms = load_unack_anomalies()
+    if not anoms.empty:
+        st.markdown("---")
+        st.error(f"⚠️ {len(anoms)} statistical anomal{'ies' if len(anoms)>1 else 'y'}")
+        for _, a in anoms.iterrows():
+            if a['severity'] == 'extreme': css = 'alert-urgent'
+            elif a['severity'] == 'severe': css = 'alert-warning'
+            else: css = 'alert-info'
+            
+            icon = '↑' if a['anomaly_type'] == 'spike' else '↓'
+            
+            col1, col2 = st.columns([4, 1])
+            col1.markdown(f"""
+<div class="{css}">
+  <b>{a['zone_name']}</b><br>
+  <small>{icon} {a['anomaly_type'].title()} ({a['severity']}) | z={a['z_score']:.1f}</small><br>
+  <small>Rate: {a['current_rate']:.1f} vs avg {a['baseline_rate']:.1f}</small>
+</div>""", unsafe_allow_html=True)
+            if col2.button("✓", key=f"ack_anom_{a['id']}"):
+                ack_anomaly(int(a['id']))
+                st.rerun()
 
     st.markdown("---")
     st.markdown("**Filters**")
     hour_filter = st.slider("Hours of violations to show", 1, 168, 24, step=1)
+    
+    heatmap_type = st.radio("Heatmap Weight", ["Violation Volume", "Congestion Impact"])
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     show_heatmap = st.checkbox("Show heatmap layer", True)
     show_markers = st.checkbox("Show zone markers", True)
+    show_pois    = st.checkbox("Show POIs (Commercial/Metro)", True)
 
     st.markdown("---")
     if st.button("🔄 Refresh now"):
@@ -176,44 +301,108 @@ TIER_ORDER = {'LOW': 0, 'MEDIUM': 1, 'HIGH': 2, 'CRITICAL': 3}
 state_df = load_ingestion_state()
 if not state_df.empty:
     state = state_df.iloc[0]
-    st.caption(
-        f"🔴 **LIVE** &nbsp;|&nbsp; "
-        f"**{int(state['total_rows_ingested']):,}** violations ingested &nbsp;|&nbsp; "
-        f"Last: `{str(state['last_ingested_datetime'])[:19]}` &nbsp;|&nbsp; "
-        f"Dashboard refreshed: `{datetime.now().strftime('%H:%M:%S')}`"
-    )
+    st.markdown(f"""
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+        <div>
+            <h1 style="margin-bottom: 0px;"><span class="gradient-text">Gridlock AI</span> <span style="font-weight:300; opacity:0.8;">Command Center</span></h1>
+        </div>
+        <div style="text-align: right; opacity: 0.7; font-size: 14px;">
+            <span style="color:#ef4444; font-weight:700;">● LIVE</span> &nbsp;|&nbsp; 
+            <b>{int(state['total_rows_ingested']):,}</b> violations &nbsp;|&nbsp; 
+            Last: {str(state['last_ingested_datetime'])[:19]} &nbsp;|&nbsp; 
+            Refreshed: {datetime.now().strftime('%H:%M:%S')}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 zones = load_live_zones()
 violations = load_recent_violations(hours=hour_filter)
 
+def kpi_card(title, value, color_hex):
+    return f"""
+    <div style="background: linear-gradient(135deg, rgba(30,41,59,0.5) 0%, rgba(15,23,42,0.8) 100%); 
+         border: 1px solid rgba(255,255,255,0.05); border-top: 3px solid {color_hex}; 
+         border-radius: 12px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+         margin-bottom: 20px;">
+        <p style="color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0;">{title}</p>
+        <h2 style="color: #f8fafc; font-size: 2.2rem; font-weight: 700; margin: 0; text-shadow: 0 0 15px {color_hex}40;">{value}</h2>
+    </div>
+    """
+
 # KPI row
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Active clusters", len(zones))
-col2.metric("CRITICAL zones",  int((zones['risk_tier'] == 'CRITICAL').sum()) if not zones.empty else 0)
-col3.metric("HIGH zones",      int((zones['risk_tier'] == 'HIGH').sum()) if not zones.empty else 0)
-col4.metric(f"Violations ({hour_filter}h)", f"{len(violations):,}")
-col5.metric("Unacked alerts",  len(alerts))
+with col1: st.markdown(kpi_card("Active Clusters", len(zones), "#3b82f6"), unsafe_allow_html=True)
+with col2: st.markdown(kpi_card("CRITICAL Zones", int((zones['risk_tier'] == 'CRITICAL').sum()) if not zones.empty else 0, "#ef4444"), unsafe_allow_html=True)
+with col3: st.markdown(kpi_card("HIGH Zones", int((zones['risk_tier'] == 'HIGH').sum()) if not zones.empty else 0, "#f97316"), unsafe_allow_html=True)
+with col4: st.markdown(kpi_card(f"Violations ({hour_filter}h)", f"{len(violations):,}", "#8b5cf6"), unsafe_allow_html=True)
+with col5: st.markdown(kpi_card("Unacked Alerts", len(alerts), "#22c55e"), unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ── Map ────────────────────────────────────────────────────────
-st.subheader("🗺️ Live Enforcement Map")
+# ── Main Workspace Tabs ────────────────────────────────────────
+tab_map, tab_analytics, tab_data = st.tabs([
+    "🗺️ Live Operations & Deployments", 
+    "📈 Analytics & Trends", 
+    "🗄️ Data Explorer"
+])
+
+# ==========================================
+# TAB 1: LIVE MAP & DEPLOYMENTS
+# ==========================================
+with tab_map:
+    st.markdown("<br>", unsafe_allow_html=True)
 
 BLR = [12.9716, 77.5946]
 m   = folium.Map(location=BLR, zoom_start=12, tiles='CartoDB dark_matter')
 
-# Heatmap layer
-if show_heatmap and not violations.empty:
-    heat_cols = ['latitude', 'longitude']
-    if 'impact' in violations.columns:
-        heat_cols.append('impact')
-    heat_data = violations[heat_cols].dropna().values.tolist()
-    if heat_data:
-        HeatMap(heat_data, name='Live violations (heatmap)',
-                min_opacity=0.3, radius=10, blur=14,
-                gradient={0.2:'#440154', 0.45:'#31688e',
-                          0.7:'#35b779', 1.0:'#fde725'}
-                ).add_to(m)
+# Heatmap layer — respects the hours slider
+if show_heatmap:
+    heatmap_data = load_violations_for_heatmap(hours=hour_filter)
+    if not heatmap_data.empty:
+        if heatmap_type == "Congestion Impact":
+            # Aggressive filter: keep ONLY the top ~7% of worst choke points
+            heatmap_data = heatmap_data[heatmap_data['impact'] >= 4.0].copy()
+            heatmap_data['impact'] = heatmap_data['impact'] ** 2
+            heat_cols = ['latitude', 'longitude', 'impact']
+            # Stark, aggressive color gradient (Purple -> Neon Pink -> Bright White)
+            heat_gradient = {0.2:'#2e004f', 0.4:'#71007a', 0.6:'#c4006c', 0.8:'#ff1a55', 1.0:'#ffffff'}
+            h_radius = 22
+            h_blur = 15
+        else:
+            heatmap_data['volume_weight'] = 1.0
+            heat_cols = ['latitude', 'longitude', 'volume_weight']
+            # Standard density gradient (Dark blue -> Green -> Yellow)
+            heat_gradient = {0.2:'#0d0221', 0.4:'#0a1045', 0.6:'#31688e', 0.8:'#35b779', 1.0:'#fde725'}
+            h_radius = 18
+            h_blur = 22
+            
+        heat_data = heatmap_data[heat_cols].dropna().values.tolist()
+        if heat_data:
+            HeatMap(heat_data, name=f'{heatmap_type} (heatmap)',
+                    min_opacity=0.35, radius=h_radius, blur=h_blur, max_zoom=13,
+                    gradient=heat_gradient
+                    ).add_to(m)
+
+# POI Markers
+if show_pois:
+    POIS = [
+        {"name": "Indiranagar Metro", "lat": 12.9783, "lon": 77.6387, "icon": "train"},
+        {"name": "MG Road Metro", "lat": 12.9755, "lon": 77.6068, "icon": "train"},
+        {"name": "Majestic Bus/Metro", "lat": 12.9757, "lon": 77.5729, "icon": "train"},
+        {"name": "Manyata Tech Park", "lat": 13.0450, "lon": 77.6206, "icon": "building"},
+        {"name": "Ecospace Tech Park", "lat": 12.9248, "lon": 77.6806, "icon": "building"},
+        {"name": "KR Market", "lat": 12.9634, "lon": 77.5760, "icon": "shopping-cart"},
+        {"name": "Koramangala BDA", "lat": 12.9284, "lon": 77.6262, "icon": "shopping-cart"}
+    ]
+    fg_poi = folium.FeatureGroup(name='Commercial / Transit Hubs', show=True)
+    for poi in POIS:
+        folium.Marker(
+            location=[poi['lat'], poi['lon']],
+            popup=f"<b>{poi['name']}</b>",
+            tooltip=poi['name'],
+            icon=folium.Icon(color='purple', icon=poi['icon'], prefix='fa')
+        ).add_to(fg_poi)
+    fg_poi.add_to(m)
 
 # Zone markers
 if show_markers and not zones.empty:
@@ -254,44 +443,110 @@ if show_markers and not zones.empty:
         ).add_to(fg)
     fg.add_to(m)
 
-folium.LayerControl(collapsed=False).add_to(m)
-st_folium(m, width='100%', height=500)
+    folium.LayerControl(collapsed=False).add_to(m)
+    st_folium(m, width='100%', height=550, key=f"map_{hour_filter}_{show_heatmap}_{show_markers}_{show_pois}_{heatmap_type}")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
-st.markdown("---")
+    # ── AI Forecast ────────────────────────────────────────────────
+    fcast = load_forecasts()
+    if not fcast.empty:
+        st.subheader("🔮 AI Prediction: Next-Shift Hotspots")
+        st.markdown("<p style='color:#94a3b8; font-size:14px; margin-top:-10px;'>GradientBoosting model forecasting next 3 hours based on historical hour/dow/month patterns.</p>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+    cols = [col1, col2, col3]
+    
+    for offset in range(1, 4):
+        hour_fcast = fcast[fcast['hour_offset'] == offset]
+        if hour_fcast.empty: continue
+        
+        target_time = str(hour_fcast.iloc[0]['target_datetime'])[11:16]
+        with cols[offset-1]:
+            st.markdown(f"**In {offset} hour{'s' if offset>1 else ''} ({target_time})**")
+            for _, r in hour_fcast.head(5).iterrows():
+                pred = r['predicted_violations']
+                if pred >= 20:   color = "red"
+                elif pred >= 10: color = "orange"
+                else:            color = "green"
+                
+                st.markdown(f"- :{color}[**{pred:.0f}**] violations expected at {r['zone_name']}")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("🚔 Actionable Deployment Plan (Next 3 Hours)")
+    st.markdown("Recommended patrol allocation based on AI predictions.")
+    
+    # Aggregate predictions by police station
+    station_preds = fcast.groupby('police_station')['predicted_violations'].sum().reset_index()
+    station_preds = station_preds[station_preds['police_station'] != 'Unknown']
+    station_preds = station_preds.sort_values('predicted_violations', ascending=False).head(5)
+    
+    if not station_preds.empty:
+        col_deploy1, col_deploy2 = st.columns([2, 3])
+        
+        with col_deploy1:
+            for _, r in station_preds.iterrows():
+                total_pred = r['predicted_violations']
+                # Simple rule: 1 patrol per 15 expected violations
+                patrols = max(1, int(total_pred / 15))
+                st.info(f"**{r['police_station']}**\n\nDeploy **{patrols} patrol{'s' if patrols > 1 else ''}** ({total_pred:.0f} expected)")
+                
+        with col_deploy2:
+            # Show the top zones for the top station
+            top_station = station_preds.iloc[0]['police_station']
+            top_station_zones = fcast[fcast['police_station'] == top_station]
+            top_station_zones = top_station_zones.groupby('zone_name')['predicted_violations'].sum().reset_index()
+            top_station_zones = top_station_zones.sort_values('predicted_violations', ascending=False).head(3)
+            
+            st.markdown(f"**🎯 Priority targets for {top_station} patrols:**")
+            for _, r in top_station_zones.iterrows():
+                st.markdown(f"- 📍 {r['zone_name']} ({r['predicted_violations']:.0f} violations)")
 
-# ── Score trend chart ──────────────────────────────────────────
-st.subheader("📈 Score Trends — Top 5 Zones")
-if not zones.empty:
-    top5_clusters = zones.nlargest(5, 'congestion_score')['cluster'].tolist()
-    history = load_score_history(top5_clusters)
-    if not history.empty:
-        history['recalculated_at'] = pd.to_datetime(history['recalculated_at'], errors='coerce')
-        pivot = history.pivot_table(
-            index='recalculated_at', columns='zone_name',
-            values='congestion_score', aggfunc='mean'
-        )
-        st.line_chart(pivot, use_container_width=True)
+# ==========================================
+# TAB 2: ANALYTICS & TRENDS
+# ==========================================
+with tab_analytics:
+    st.markdown("<br>", unsafe_allow_html=True)
+    # ── Score trend chart ──────────────────────────────────────────
+    st.subheader("📈 Score Trends — Top 5 Zones")
+    if not zones.empty:
+        top5_clusters = zones.nlargest(5, 'congestion_score')['cluster'].tolist()
+        history = load_score_history(top5_clusters)
+        if not history.empty:
+            history['recalculated_at'] = pd.to_datetime(history['recalculated_at'], errors='coerce')
+            pivot = history.pivot_table(
+                index='recalculated_at', columns='zone_name',
+                values='congestion_score', aggfunc='mean'
+            )
+            st.line_chart(pivot, use_container_width=True)
+        else:
+            st.info("Score history will appear after 2+ pipeline ticks.")
+
+# ==========================================
+# TAB 3: DATA EXPLORER
+# ==========================================
+with tab_data:
+    st.markdown("<br>", unsafe_allow_html=True)
+    # ── Zone table ─────────────────────────────────────────────────
+    st.subheader("🏆 Current Zone Rankings")
+    if not zones.empty:
+        display_cols = ['zone_name', 'congestion_score', 'risk_tier', 'violation_count',
+                        'daily_rate', 'blockage_pct', 'enforcement_shift', 'police_station']
+        display_cols = [c for c in display_cols if c in zones.columns]
+
+        def color_tier(val):
+            colors = {'CRITICAL':'#ef4444','HIGH':'#f97316','MEDIUM':'#eab308','LOW':'#22c55e'}
+            return f'color: {colors.get(val,"#e2e8f0")}'
+
+        styled = zones[display_cols].head(20).style.map(color_tier, subset=['risk_tier'])
+        st.dataframe(styled, use_container_width=True, height=450)
     else:
-        st.info("Score history will appear after 2+ pipeline ticks.")
-
-# ── Zone table ─────────────────────────────────────────────────
-st.subheader("🏆 Current Zone Rankings")
-if not zones.empty:
-    display_cols = ['zone_name', 'congestion_score', 'risk_tier', 'violation_count',
-                    'daily_rate', 'blockage_pct', 'enforcement_shift', 'police_station']
-    display_cols = [c for c in display_cols if c in zones.columns]
-
-    def color_tier(val):
-        colors = {'CRITICAL':'#ef4444','HIGH':'#f97316','MEDIUM':'#eab308','LOW':'#22c55e'}
-        return f'color: {colors.get(val,"#e2e8f0")}'
-
-    styled = zones[display_cols].head(20).style.map(color_tier, subset=['risk_tier'])
-    st.dataframe(styled, use_container_width=True, height=450)
-else:
-    st.info("Waiting for first score calculation...")
-
-# ── Alert history table ────────────────────────────────────────
-with st.expander("📋 Full alert log"):
+        st.info("Waiting for first score calculation...")
+    
+    st.markdown("---")
+    
+    # ── Alert history table ────────────────────────────────────────
+    st.subheader("📋 Full Alert Log")
     conn = get_conn()
     all_alerts = pd.read_sql(
         "SELECT * FROM alerts ORDER BY triggered_at DESC LIMIT 50", conn)

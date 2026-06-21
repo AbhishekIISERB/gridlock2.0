@@ -30,3 +30,11 @@ parking_heatmap.html
 
 # Jupyter
 .ipynb_checkpoints/
+
+# DB and logs
+db/*.db
+db/*.db-wal
+db/*.db-shm
+db/*.pkl
+*.log
+test_args.py

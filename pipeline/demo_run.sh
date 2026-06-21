@@ -38,11 +38,28 @@ echo "  Pipeline PID: $PIPELINE_PID"
 # Give pipeline one tick to generate some data
 sleep 12
 
-# Step 5: Launch live dashboard
+# Step 5: Launch FastAPI REST layer in background
 echo ""
-echo "▶ Launching Streamlit dashboard..."
-echo "  Open http://localhost:8501 in your browser"
-echo "  Press Ctrl+C to stop"
+echo "▶ Launching Gridlock AI REST API (port 8502)..."
+uvicorn api:app --host 0.0.0.0 --port 8502 --log-level warning &
+API_PID=$!
+echo "  API PID: $API_PID"
+
+sleep 2
+
+# Step 6: Launch live dashboard
+echo ""
+echo "═══════════════════════════════════════════════"
+echo "  GRIDLOCK AI IS LIVE"
+echo "═══════════════════════════════════════════════"
+echo ""
+echo "  Police Command Center (NEW frontend):"
+echo "      http://localhost:8502"
+echo ""
+echo "  Streamlit Analytics Dashboard:"
+echo "      http://localhost:8501"
+echo ""
+echo "  Press Ctrl+C to stop everything"
 echo ""
 streamlit run streamlit_live.py
 
@@ -50,4 +67,6 @@ streamlit run streamlit_live.py
 echo ""
 echo "Stopping pipeline (PID $PIPELINE_PID)..."
 kill $PIPELINE_PID 2>/dev/null || true
+echo "Stopping API (PID $API_PID)..."
+kill $API_PID 2>/dev/null || true
 echo "Done."

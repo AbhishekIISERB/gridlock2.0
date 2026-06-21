@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Belaku — ಪೊಲೀಸ್ ಕಮಾಂಡ್ ಸೆಂಟರ್</title>
+  <meta name="description" content="Belaku Police Command Center — Live illegal parking enforcement intelligence for Bangalore Police"/>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.css" onerror="void(0)"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg-base:    #060b14;
+      --bg-card:    rgba(15,23,42,0.8);
+      --bg-sidebar: rgba(10,17,30,0.95);
+      --border:     rgba(56,189,248,0.12);
+      --accent-1:   #38bdf8;
+      --accent-2:   #818cf8;
+      --accent-3:   #c084fc;
+      --red:        #ef4444;
+      --orange:     #f97316;
+      --yellow:     #eab308;
+      --green:      #22c55e;
+      --text-1:     #f0f9ff;
+      --text-2:     #94a3b8;
+      --text-3:     #475569;
+      --font-en: 'Outfit', sans-serif;
+      --font-kn: 'Noto Sans Kannada', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-1);
+      font-family: var(--font-en);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body.lang-kn { font-family: var(--font-kn); }
+
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── Layout ── */
+    .app { display: flex; height: 100vh; position: relative; z-index: 1; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 280px; flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; position: relative;
+      backdrop-filter: blur(20px);
+    }
+
+    .sidebar-logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-text {
+      font-size: 1.2rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-2), var(--accent-3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .logo-sub { font-size: 0.7rem; color: var(--text-2); margin-top: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px;
+      background: var(--red); border-radius: 50%;
+      animation: pulse 2s infinite; margin-right: 6px;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+    }
+
+    .sidebar-section { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .sidebar-section h3 { font-size: 0.7rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+
+    /* Language toggle */
+    .lang-toggle {
+      display: flex; gap: 4px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px; padding: 3px;
+    }
+    .lang-btn {
+      flex: 1; padding: 6px 0; font-size: 0.8rem; font-weight: 600;
+      border: none; border-radius: 6px; cursor: pointer;
+      transition: all 0.2s; background: transparent; color: var(--text-2);
+    }
+    .lang-btn.active {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      color: #fff; box-shadow: 0 2px 8px rgba(56,189,248,0.3);
+    }
+
+    /* Filters */
+    .filter-label { font-size: 0.75rem; color: var(--text-2); margin-bottom: 6px; display: block; }
+    .filter-slider {
+      width: 100%; -webkit-appearance: none; height: 4px;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    .filter-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: white; border-radius: 50%;
+      box-shadow: 0 0 8px rgba(56,189,248,0.8);
+    }
+    .slider-val { font-size: 0.9rem; font-weight: 700; color: var(--accent-1); }
+
+    .heatmap-radios { display: flex; flex-direction: column; gap: 6px; }
+    .heatmap-radio-btn {
+      padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-2); font-size: 0.78rem;
+      cursor: pointer; text-align: left; font-family: inherit;
+      transition: all 0.2s;
+    }
+    .heatmap-radio-btn.active {
+      background: rgba(56,189,248,0.1); border-color: var(--accent-1);
+      color: var(--accent-1);
+    }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .toggle { position: relative; width: 36px; height: 20px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--text-3); border-radius: 20px; transition: 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; height: 14px; width: 14px;
+      left: 3px; bottom: 3px; background: white; border-radius: 50%;
+      transition: 0.3s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent-1); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+    .toggle-label { font-size: 0.78rem; color: var(--text-2); }
+
+    .refresh-btn {
+      width: calc(100% - 40px); margin: 12px 20px;
+      padding: 10px; border-radius: 10px;
+      background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(129,140,248,0.15));
+      border: 1px solid rgba(56,189,248,0.3);
+      color: var(--accent-1); font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.2s;
+    }
+    .refresh-btn:hover { background: rgba(56,189,248,0.25); transform: translateY(-1px); }
+
+    /* Alert feed in sidebar */
+    .alert-item {
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+      border-left: 3px solid;
+    }
+    .alert-item.critical { background: rgba(127,29,29,0.5); border-color: var(--red); }
+    .alert-item.high     { background: rgba(124,45,18,0.5); border-color: var(--orange); }
+    .alert-item.normal   { background: rgba(30,58,138,0.4); border-color: var(--accent-1); }
+    .alert-item.spike    { background: rgba(88,28,135,0.4); border-color: var(--accent-3); }
+    .alert-zone { font-size: 0.78rem; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+    .alert-meta { font-size: 0.68rem; color: var(--text-2); }
+    .ack-btn {
+      margin-top: 6px; padding: 3px 10px; border-radius: 4px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--green); font-size: 0.65rem; cursor: pointer;
+      font-family: inherit;
+    }
+    .ack-btn:hover { background: rgba(34,197,94,0.1); }
+
+    .no-alerts { font-size: 0.78rem; color: var(--green); padding: 8px 0; }
+
+    /* ── Main content ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Header bar */
+    .topbar {
+      height: 56px; flex-shrink: 0;
+      display: flex; align-items: center; padding: 0 24px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      gap: 12px; backdrop-filter: blur(20px);
+    }
+    .topbar-title { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    .topbar-ts { font-size: 0.72rem; color: var(--text-2); }
+
+    /* KPI row */
+    .kpi-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 12px; padding: 16px 20px;
+      flex-shrink: 0;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top: 2px solid;
+      border-radius: 12px; padding: 16px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); }
+    .kpi-card:nth-child(1) { border-top-color: var(--accent-1); }
+    .kpi-card:nth-child(2) { border-top-color: var(--red); }
+    .kpi-card:nth-child(3) { border-top-color: var(--orange); }
+    .kpi-card:nth-child(4) { border-top-color: var(--accent-2); }
+    .kpi-card:nth-child(5) { border-top-color: var(--green); }
+    .kpi-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-2); font-weight: 600; margin-bottom: 8px; }
+    .kpi-value { font-size: 1.9rem; font-weight: 800; color: var(--text-1); line-height: 1; }
+    .kpi-sub { font-size: 0.65rem; color: var(--text-3); margin-top: 4px; }
+
+    /* Tab strip */
+    .tabs {
+      display: flex; padding: 0 20px; gap: 2px;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 10px 18px; font-size: 0.78rem; font-weight: 600;
+      border: none; background: transparent; color: var(--text-2);
+      cursor: pointer; font-family: inherit;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active { color: var(--accent-1); border-bottom-color: var(--accent-1); }
+    .tab-btn:hover:not(.active) { color: var(--text-1); }
+
+    /* Tab panels */
+    .tab-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Map */
+    #map {
+      width: 100%; height: 480px;
+      border-radius: 14px; overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 40px rgba(56,189,248,0.08);
+    }
+    .leaflet-container { background: #060b14 !important; }
+
+    /* AI Forecast grid */
+    .forecast-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 16px; }
+    .forecast-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; backdrop-filter: blur(10px);
+    }
+    .forecast-card-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-1); font-weight: 600; margin-bottom: 12px; }
+    .forecast-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .forecast-item:last-child { border-bottom: none; }
+    .forecast-badge {
+      min-width: 36px; height: 24px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700;
+    }
+    .forecast-badge.high  { background: rgba(239,68,68,0.2); color: #f87171; }
+    .forecast-badge.med   { background: rgba(249,115,22,0.2); color: #fb923c; }
+    .forecast-badge.low   { background: rgba(34,197,94,0.2);  color: #4ade80; }
+    .forecast-name { font-size: 0.74rem; color: var(--text-2); flex: 1; }
+
+    /* Deployment */
+    .deployment-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-top: 16px; }
+    .deploy-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; backdrop-filter: blur(10px);
+      position: relative; overflow: hidden;
+    }
+    .deploy-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+    }
+    .deploy-station { font-size: 0.82rem; font-weight: 700; color: var(--text-1); margin-bottom: 4px; }
+    .deploy-patrols {
+      font-size: 1.6rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .deploy-patrols-label { font-size: 0.65rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 1px; }
+    .deploy-zones { margin-top: 10px; }
+    .deploy-zone-item { font-size: 0.72rem; color: var(--text-2); padding: 3px 0; display: flex; align-items: center; gap: 6px; }
+    .deploy-zone-item::before { content: '📍'; font-size: 0.7rem; }
+
+    /* Zone table */
+    .zone-table-wrap { overflow-x: auto; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 12px; text-align: left;
+      font-size: 0.68rem; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(56,189,248,0.04); }
+    tbody td { padding: 10px 12px; font-size: 0.78rem; color: var(--text-2); }
+    tbody td:first-child { color: var(--text-1); font-weight: 500; }
+    .tier-badge {
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 0.65rem; font-weight: 700;
+      display: inline-block;
+    }
+    .tier-CRITICAL { background: rgba(239,68,68,0.15); color: #f87171; }
+    .tier-HIGH     { background: rgba(249,115,22,0.15); color: #fb923c; }
+    .tier-MEDIUM   { background: rgba(234,179,8,0.15);  color: #facc15; }
+    .tier-LOW      { background: rgba(34,197,94,0.15);  color: #4ade80; }
+
+    /* Score trend chart */
+    #scoreChart { max-height: 320px; }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      margin: 20px 0 12px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-header h2 { font-size: 0.9rem; font-weight: 700; color: var(--text-1); }
+    .section-header p { font-size: 0.72rem; color: var(--text-2); }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(56,189,248,0.2);
+      border-top-color: var(--accent-1); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { color: var(--text-3); font-size: 0.8rem; padding: 24px; text-align: center; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    @media (max-width: 1100px) {
+      .kpi-row { grid-template-columns: repeat(3,1fr); }
+      .forecast-grid { grid-template-columns: 1fr; }
+      .deployment-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Belaku</div>
+      <div class="logo-sub" data-i18n="cmd_center">Command Center</div>
+      <div style="margin-top:8px; font-size:0.72rem; color:var(--text-2);">
+        <span class="live-dot"></span>
+        <span data-i18n="live_label">LIVE — Auto-refreshes every 30s</span>
+      </div>
+    </div>
+
+    <!-- Language toggle -->
+    <div class="sidebar-section">
+      <h3 data-i18n="language">Language</h3>
+      <div class="lang-toggle">
+        <button class="lang-btn active" id="btn-en" onclick="setLang('en')">English</button>
+        <button class="lang-btn"        id="btn-kn" onclick="setLang('kn')">ಕನ್ನಡ</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="sidebar-section">
+      <h3 data-i18n="filters">Filters</h3>
+
+      <label class="filter-label">
+        <span data-i18n="hours_filter">Hours to show:</span>
+        <span class="slider-val" id="hrs-val">24</span>h
+      </label>
+      <input type="range" class="filter-slider" id="hours-slider" min="1" max="168" value="24"
+             oninput="document.getElementById('hrs-val').textContent=this.value; applyFilters()"/>
+
+      <div style="height:14px"></div>
+      <label class="filter-label" data-i18n="heatmap_mode">Heatmap Mode</label>
+      <div class="heatmap-radios">
+        <button class="heatmap-radio-btn active" id="mode-vol" onclick="setHeatmapMode('volume')" data-i18n="vol_mode">📊 Violation Volume</button>
+        <button class="heatmap-radio-btn"        id="mode-imp" onclick="setHeatmapMode('impact')" data-i18n="imp_mode">🚨 Congestion Impact</button>
+      </div>
+
+      <div style="height:14px"></div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="tog-heatmap" checked onchange="applyFilters()"><span class="toggle-slider"></span></label>
+        <span class="toggle-label" data-i18n="show_heatmap">Show Heatmap</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="tog-zones" checked onchange="applyFilters()"><span class="toggle-slider"></span></label>
+        <span class="toggle-label" data-i18n="show_zones">Show Zone Markers</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="tog-pois" checked onchange="applyFilters()"><span class="toggle-slider"></span></label>
+        <span class="toggle-label" data-i18n="show_pois">Show POIs</span>
+      </div>
+    </div>
+
+    <!-- Live alert feed -->
+    <div class="sidebar-section" style="flex:1">
+      <h3 data-i18n="live_alerts">Live Alerts</h3>
+      <div id="sidebar-alerts"><div class="spinner"></div></div>
+    </div>
+
+    <button class="refresh-btn" onclick="loadAll()">
+      🔄 <span data-i18n="refresh_now">Refresh Now</span>
+    </button>
+  </aside>
+
+  <!-- ═══════════════ MAIN ═══════════════ -->
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-title">
+        <span data-i18n="app_title">Belaku</span>
+        <span style="font-weight:300; opacity:0.7"> — <span data-i18n="app_subtitle">Bangalore Police Enforcement Intelligence</span></span>
+      </div>
+      <div class="topbar-ts" id="ts-bar">—</div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label" data-i18n="kpi_clusters">Active Clusters</div>
+        <div class="kpi-value" id="kpi-clusters">—</div>
+        <div class="kpi-sub" data-i18n="kpi_clusters_sub">Enforcement zones</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label" data-i18n="kpi_critical">Critical Zones</div>
+        <div class="kpi-value" id="kpi-critical">—</div>
+        <div class="kpi-sub" data-i18n="kpi_critical_sub">Score ≥ 75</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label" data-i18n="kpi_high">High Zones</div>
+        <div class="kpi-value" id="kpi-high">—</div>
+        <div class="kpi-sub" data-i18n="kpi_high_sub">Score 50–75</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label" data-i18n="kpi_ingested">Violations Ingested</div>
+        <div class="kpi-value" id="kpi-ingested">—</div>
+        <div class="kpi-sub" id="kpi-last">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label" data-i18n="kpi_alerts">Unacked Alerts</div>
+        <div class="kpi-value" id="kpi-alerts">—</div>
+        <div class="kpi-sub" data-i18n="kpi_alerts_sub">Needs attention</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('live')"    data-i18n="tab_live">🗺️ Live Operations</button>
+      <button class="tab-btn"        onclick="switchTab('deploy')"  data-i18n="tab_deploy">🚔 Deployment Plan</button>
+      <button class="tab-btn"        onclick="switchTab('predict')" data-i18n="tab_predict">🔮 AI Predictions</button>
+      <button class="tab-btn"        onclick="switchTab('data')"    data-i18n="tab_data">📊 Analytics</button>
+    </div>
+
+    <!-- ─── TAB: Live Operations ─── -->
+    <div class="tab-content">
+      <div id="tab-live" class="tab-panel active">
+        <div id="map"></div>
+
+        <div class="section-header" style="margin-top:20px">
+          <h2>⚠️ <span data-i18n="anomaly_header">Statistical Anomalies</span></h2>
+        </div>
+        <div id="anomaly-list" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px;">
+          <div class="empty-state" data-i18n="loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- ─── TAB: Deployment Plan ─── -->
+      <div id="tab-deploy" class="tab-panel">
+        <div class="section-header">
+          <div>
+            <h2>🚔 <span data-i18n="deploy_header">Actionable Patrol Deployment (Next 3 Hours)</span></h2>
+            <p data-i18n="deploy_sub">Recommended patrols based on AI violation forecast · 1 patrol per 15 expected violations</p>
+          </div>
+        </div>
+        <div class="deployment-grid" id="deploy-grid">
+          <div class="empty-state" data-i18n="loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- ─── TAB: AI Predictions ─── -->
+      <div id="tab-predict" class="tab-panel">
+        <div class="section-header">
+          <div>
+            <h2>🔮 <span data-i18n="predict_header">Next-Shift Hotspot Predictions</span></h2>
+            <p data-i18n="predict_sub" style="line-height:1.4; opacity:0.9; margin-top:4px;">Prioritized hit-list: Tells police exactly how many violations to expect, where they will happen, and which areas need patrols sent first.</p>
+          </div>
+        </div>
+        <div class="forecast-grid" id="forecast-grid">
+          <div class="empty-state" data-i18n="loading">Loading...</div>
+        </div>
+      </div>
+
+      <!-- ─── TAB: Analytics ─── -->
+      <div id="tab-data" class="tab-panel">
+        <div class="section-header">
+          <h2>📈 <span data-i18n="analytics_header">Score Trends — Top 5 Zones</span></h2>
+        </div>
+        <canvas id="scoreChart"></canvas>
+
+        <div class="section-header" style="margin-top:28px">
+          <h2>🏆 <span data-i18n="rankings_header">Current Zone Rankings</span></h2>
+        </div>
+        <div class="zone-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="th_zone">Zone</th>
+                <th data-i18n="th_score">Score</th>
+                <th data-i18n="th_tier">Tier</th>
+                <th data-i18n="th_violations">Violations</th>
+                <th data-i18n="th_rate">Daily Rate</th>
+                <th data-i18n="th_blockage">Blockage</th>
+                <th data-i18n="th_station">Station</th>
+              </tr>
+            </thead>
+            <tbody id="zones-tbody">
+              <tr><td colspan="7" class="empty-state" data-i18n="loading">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /tab-content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════════
+//  TRANSLATIONS
+// ════════════════════════════════════════════
+const T = {
+  en: {
+    cmd_center:     "Police Command Center",
+    language:       "Language",
+    live_label:     "LIVE — Auto-refreshes every 30s",
+    filters:        "Filters",
+    hours_filter:   "Hours to show:",
+    heatmap_mode:   "Heatmap Mode",
+    vol_mode:       "📊 Violation Volume",
+    imp_mode:       "🚨 Congestion Impact",
+    show_heatmap:   "Show Heatmap",
+    show_zones:     "Show Zone Markers",
+    show_pois:      "Show POIs",
+    live_alerts:    "Live Alerts",
+    refresh_now:    "Refresh Now",
+    app_title:      "Belaku",
+    app_subtitle:   "Bangalore Police Enforcement Intelligence",
+    kpi_clusters:   "Active Clusters",
+    kpi_clusters_sub: "Enforcement zones",
+    kpi_critical:   "Critical Zones",
+    kpi_critical_sub: "Score ≥ 75",
+    kpi_high:       "High Zones",
+    kpi_high_sub:   "Score 50–75",
+    kpi_ingested:   "Violations Ingested",
+    kpi_alerts:     "Unacked Alerts",
+    kpi_alerts_sub: "Needs attention",
+    tab_live:       "🗺️ Live Operations",
+    tab_deploy:     "🚔 Deployment Plan",
+    tab_predict:    "🔮 AI Predictions",
+    tab_data:       "📊 Analytics",
+    anomaly_header: "Statistical Anomalies",
+    deploy_header:  "Actionable Patrol Deployment (Next 3 Hours)",
+    deploy_sub:     "Recommended patrols · 1 patrol per 15 expected violations",
+    predict_header: "Next-Shift Hotspot Predictions",
+    predict_sub:    "Prioritized hit-list: Tells police exactly how many violations to expect, where they will happen, and which areas need patrols sent first.",
+    analytics_header: "Score Trends — Top 5 Zones",
+    rankings_header:  "Current Zone Rankings",
+    th_zone:        "Zone", th_score: "Score", th_tier: "Tier",
+    th_violations:  "Violations", th_rate: "Daily Rate",
+    th_blockage:    "Blockage %", th_station: "Station",
+    patrol_unit:    "patrol(s) recommended",
+    no_alerts:      "✅ No active alerts",
+    loading:        "Loading...",
+    expected:       "violations expected",
+    in_x_hour:      "In {n} hour(s) — {t}",
+    zones_for:      "Priority zones for",
+    ack:            "Acknowledge",
+    spike:          "Spike ↑", drop: "Drop ↓",
+  },
+  kn: {
+    cmd_center:     "ಪೊಲೀಸ್ ಕಮಾಂಡ್ ಸೆಂಟರ್",
+    language:       "ಭಾಷೆ",
+    live_label:     "ನೇರ — ಪ್ರತಿ 30 ಸೆಕೆಂಡಿಗೆ ನವೀಕರಿಸುತ್ತದೆ",
+    filters:        "ಫಿಲ್ಟರ್‌ಗಳು",
+    hours_filter:   "ತೋರಿಸಲು ಗಂಟೆಗಳು:",
+    heatmap_mode:   "ಶಾಖನಕ್ಷೆ ಮೋಡ್",
+    vol_mode:       "📊 ಉಲ್ಲಂಘನೆ ಪ್ರಮಾಣ",
+    imp_mode:       "🚨 ದಟ್ಟಣೆ ಪ್ರಭಾವ",
+    show_heatmap:   "ಶಾಖನಕ್ಷೆ ತೋರಿಸಿ",
+    show_zones:     "ವಲಯ ಗುರುತುಗಳು",
+    show_pois:      "POI ತೋರಿಸಿ",
+    live_alerts:    "ನೇರ ಎಚ್ಚರಿಕೆಗಳು",
+    refresh_now:    "ಈಗ ನವೀಕರಿಸಿ",
+    app_title:      "ಬೆಳಕು",
+    app_subtitle:   "ಬೆಂಗಳೂರು ಪೊಲೀಸ್ ಜಾರಿ ತಂತ್ರಜ್ಞಾನ",
+    kpi_clusters:   "ಸಕ್ರಿಯ ಕ್ಲಸ್ಟರ್‌ಗಳು",
+    kpi_clusters_sub: "ಜಾರಿ ವಲಯಗಳು",
+    kpi_critical:   "ಗಂಭೀರ ವಲಯಗಳು",
+    kpi_critical_sub: "ಸ್ಕೋರ್ ≥ 75",
+    kpi_high:       "ಹೆಚ್ಚಿನ ವಲಯಗಳು",
+    kpi_high_sub:   "ಸ್ಕೋರ್ 50–75",
+    kpi_ingested:   "ಉಲ್ಲಂಘನೆಗಳು ನೋಂದಾಯಿಸಲಾಗಿದೆ",
+    kpi_alerts:     "ಬಾಕಿ ಎಚ್ಚರಿಕೆಗಳು",
+    kpi_alerts_sub: "ಗಮನ ಅಗತ್ಯ",
+    tab_live:       "🗺️ ನೇರ ಕಾರ್ಯಾಚರಣೆ",
+    tab_deploy:     "🚔 ನಿಯೋಜನೆ ಯೋಜನೆ",
+    tab_predict:    "🔮 AI ಭವಿಷ್ಯ",
+    tab_data:       "📊 ವಿಶ್ಲೇಷಣೆ",
+    anomaly_header: "ಅಸಾಮಾನ್ಯ ಚಟುವಟಿಕೆಗಳು",
+    deploy_header:  "ಗಸ್ತು ನಿಯೋಜನೆ (ಮುಂದಿನ 3 ಗಂಟೆ)",
+    deploy_sub:     "AI ಮುನ್ಸೂಚನೆ ಆಧಾರದ ಗಸ್ತು",
+    predict_header: "ಮುಂದಿನ ಶಿಫ್ಟ್ ಹಾಟ್‌ಸ್ಪಾಟ್ ಭವಿಷ್ಯ",
+    predict_sub:    "ಆದ್ಯತೆಯ ಪಟ್ಟಿ: ಪೊಲೀಸ್ ಗಸ್ತು ವಾಹನಗಳನ್ನು ಮೊದಲು ಎಲ್ಲಿಗೆ ಕಳುಹಿಸಬೇಕು, ಮತ್ತು ಎಷ್ಟು ಉಲ್ಲಂಘನೆಗಳನ್ನು ನಿರೀಕ್ಷಿಸಬಹುದು ಎಂದು ಇದು ನಿಖರವಾಗಿ ತಿಳಿಸುತ್ತದೆ.",
+    analytics_header: "ಸ್ಕೋರ್ ಪ್ರವೃತ್ತಿ — ಅಗ್ರ 5 ವಲಯಗಳು",
+    rankings_header:  "ಪ್ರಸ್ತುತ ವಲಯ ಶ್ರೇಯಾಂಕ",
+    th_zone:        "ವಲಯ", th_score: "ಸ್ಕೋರ್", th_tier: "ಹಂತ",
+    th_violations:  "ಉಲ್ಲಂಘನೆಗಳು", th_rate: "ದೈನಿಕ ದರ",
+    th_blockage:    "ತಡೆ %", th_station: "ಠಾಣೆ",
+    patrol_unit:    "ಗಸ್ತು(ಗಳು) ಶಿಫಾರಸು",
+    no_alerts:      "✅ ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ",
+    loading:        "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    expected:       "ಉಲ್ಲಂಘನೆಗಳು ನಿರೀಕ್ಷಿತ",
+    in_x_hour:      "{n} ಗಂಟೆಯಲ್ಲಿ — {t}",
+    zones_for:      "ಆದ್ಯತೆ ವಲಯಗಳು",
+    ack:            "ದೃಢೀಕರಿಸಿ",
+    spike:          "ಏರಿಕೆ ↑", drop: "ಇಳಿಕೆ ↓",
+  }
+};
+
+let lang = 'en';
+function t(key, vars = {}) {
+  let s = (T[lang][key] || T['en'][key] || key);
+  for (const [k,v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
+  return s;
+}
+function setLang(l) {
+  lang = l;
+  document.body.classList.toggle('lang-kn', l === 'kn');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  document.getElementById('btn-kn').classList.toggle('active', l === 'kn');
+  // Re-render all [data-i18n] elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  // Re-render dynamic content
+  renderAlerts(state.alerts); renderAnomalies(state.anomalies);
+  renderForecasts(state.forecasts); renderDeploy(state.deploy);
+  renderZonesTable(state.zones); 
+}
+
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+const state = { zones:[], alerts:[], anomalies:[], forecasts:[], deploy:[], kpis:{} };
+const API = 'http://localhost:8502';
+let heatLayer = null, zoneLayerGroup = null, poiLayerGroup = null;
+let chartInst = null;
+let heatmapMode = 'volume';
+
+// ════════════════════════════════════════════
+//  MAP INIT
+// ════════════════════════════════════════════
+const map = L.map('map', { center:[12.9716, 77.5946], zoom:12, zoomControl:true });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution:'© OpenStreetMap © CARTO', maxZoom:20
+}).addTo(map);
+
+zoneLayerGroup = L.layerGroup().addTo(map);
+poiLayerGroup  = L.layerGroup().addTo(map);
+
+const POIS = [
+  {name:"Indiranagar Metro", lat:12.9783, lon:77.6387, icon:"🚇"},
+  {name:"MG Road Metro",     lat:12.9755, lon:77.6068, icon:"🚇"},
+  {name:"Majestic Bus/Metro",lat:12.9757, lon:77.5729, icon:"🚇"},
+  {name:"Manyata Tech Park", lat:13.0450, lon:77.6206, icon:"🏢"},
+  {name:"Ecospace Tech Park",lat:12.9248, lon:77.6806, icon:"🏢"},
+  {name:"KR Market",         lat:12.9634, lon:77.5760, icon:"🛒"},
+  {name:"Koramangala BDA",   lat:12.9284, lon:77.6262, icon:"🛒"},
+];
+
+function scoreColor(s) {
+  if (s >= 75) return '#ef4444';
+  if (s >= 50) return '#f97316';
+  if (s >= 25) return '#eab308';
+  return '#22c55e';
+}
+
+function buildMap() {
+  const showZones  = document.getElementById('tog-zones').checked;
+  const showPOIs   = document.getElementById('tog-pois').checked;
+
+  zoneLayerGroup.clearLayers();
+  poiLayerGroup.clearLayers();
+
+  if (showZones) {
+    state.zones.slice(0,30).forEach(z => {
+      if (!z.lat || !z.lon) return;
+      const col  = scoreColor(z.congestion_score);
+      const rad  = 10 + (z.congestion_score / 100) * 22;
+      const popup = `
+        <div style="font-family:'Outfit',sans-serif;min-width:210px;font-size:13px">
+          <div style="background:${col};color:#fff;padding:6px 10px;border-radius:6px 6px 0 0;font-weight:700">${z.zone_name}</div>
+          <div style="padding:8px 10px;background:#0f172a;color:#e2e8f0;border-radius:0 0 6px 6px">
+            <b>Score:</b> ${z.congestion_score}/100 &nbsp; <b>Tier:</b> ${z.risk_tier}<br>
+            <b>Violations:</b> ${z.violation_count?.toLocaleString()} &nbsp; <b>Rate:</b> ${z.daily_rate}/day<br>
+            <b>Blockage:</b> ${z.blockage_pct}% &nbsp; <b>Shift:</b> ${z.enforcement_shift}
+          </div>
+        </div>`;
+      L.circleMarker([z.lat, z.lon], {
+        radius:rad, color:col, fillColor:col, fillOpacity:0.75, weight:1.5
+      }).bindPopup(popup, {maxWidth:240})
+        .bindTooltip(`${z.zone_name} | ${z.risk_tier} | ${z.congestion_score}/100`, {sticky:true})
+        .addTo(zoneLayerGroup);
+    });
+  }
+
+  if (showPOIs) {
+    POIS.forEach(p => {
+      const icon = L.divIcon({
+        className:'',
+        html:`<div style="background:#1e1b4b;border:1.5px solid #818cf8;border-radius:8px;padding:4px 6px;font-size:13px;white-space:nowrap;color:#c7d2fe;box-shadow:0 0 12px rgba(129,140,248,0.5)">${p.icon} ${p.name}</div>`,
+        iconAnchor:[0, 0]
+      });
+      L.marker([p.lat, p.lon], {icon})
+        .bindPopup(`<b>${p.icon} ${p.name}</b>`)
+        .addTo(poiLayerGroup);
+    });
+  }
+}
+
+async function buildHeatmap() {
+  const showHeat = document.getElementById('tog-heatmap').checked;
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  if (!showHeat) return;
+
+  const hours = document.getElementById('hours-slider').value;
+  const data  = await fetchJSON(`${API}/api/heatmap?hours=${hours}&mode=${heatmapMode}`);
+  if (!data?.points?.length) return;
+
+  const gradients = {
+    volume: {0.2:'#0d0221',0.4:'#0a1045',0.6:'#31688e',0.8:'#35b779',1.0:'#fde725'},
+    impact: {0.2:'#2e004f',0.4:'#71007a',0.6:'#c4006c',0.8:'#ff1a55',1.0:'#ffffff'},
+  };
+  const radii = { volume:18, impact:22 };
+  const blurs  = { volume:22, impact:15 };
+
+  heatLayer = L.heatLayer(data.points, {
+    radius:radii[heatmapMode], blur:blurs[heatmapMode],
+    minOpacity:0.35, gradient:gradients[heatmapMode]
+  }).addTo(map);
+}
+
+// ════════════════════════════════════════════
+//  DATA LOADING
+// ════════════════════════════════════════════
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
+
+async function loadAll() {
+  const [kpis, zones, alerts, anomalies, forecasts, deploy] = await Promise.all([
+    fetchJSON(`${API}/api/kpis`),
+    fetchJSON(`${API}/api/zones`),
+    fetchJSON(`${API}/api/alerts`),
+    fetchJSON(`${API}/api/anomalies`),
+    fetchJSON(`${API}/api/forecasts`),
+    fetchJSON(`${API}/api/deployment`),
+  ]);
+
+  if (kpis)      { state.kpis = kpis; renderKPIs(kpis); }
+  if (zones)     { state.zones = zones; buildMap(); loadScoreChart(); }
+  if (alerts)    { state.alerts = alerts; renderAlerts(alerts); }
+  if (anomalies) { state.anomalies = anomalies; renderAnomalies(anomalies); }
+  if (forecasts) { state.forecasts = forecasts; renderForecasts(forecasts); }
+  if (deploy)    { state.deploy = deploy; renderDeploy(deploy); }
+  if (zones)     { renderZonesTable(zones); }
+
+  buildHeatmap();
+  document.getElementById('ts-bar').textContent = new Date().toLocaleTimeString();
+}
+
+// ════════════════════════════════════════════
+//  RENDER FUNCTIONS
+// ════════════════════════════════════════════
+function renderKPIs(d) {
+  document.getElementById('kpi-clusters').textContent  = d.active_clusters?.toLocaleString() || '—';
+  document.getElementById('kpi-critical').textContent  = d.critical_zones?.toLocaleString() || '—';
+  document.getElementById('kpi-high').textContent      = d.high_zones?.toLocaleString() || '—';
+  document.getElementById('kpi-ingested').textContent  = d.total_ingested?.toLocaleString() || '—';
+  document.getElementById('kpi-alerts').textContent    = d.unacked_alerts?.toLocaleString() || '—';
+  document.getElementById('kpi-last').textContent      = d.last_ingested ? `Last: ${d.last_ingested}` : '';
+}
+
+function renderAlerts(alerts) {
+  const el = document.getElementById('sidebar-alerts');
+  if (!alerts?.length) { el.innerHTML = `<div class="no-alerts">${t('no_alerts')}</div>`; return; }
+  el.innerHTML = alerts.slice(0,8).map(a => {
+    const isCrit = a.new_tier === 'CRITICAL';
+    const cls    = isCrit ? 'critical' : (a.new_tier === 'HIGH' ? 'high' : 'normal');
+    return `<div class="alert-item ${cls}">
+      <div class="alert-zone">${a.zone_name}</div>
+      <div class="alert-meta">${a.previous_tier} → ${a.new_tier} · ${String(a.triggered_at||'').slice(0,16)}</div>
+      ${a.acknowledged ? '' : `<button class="ack-btn" onclick="ackAlert(${a.id})">${t('ack')}</button>`}
+    </div>`;
+  }).join('');
+}
+
+function renderAnomalies(list) {
+  const el = document.getElementById('anomaly-list');
+  if (!list?.length) { el.innerHTML = `<div class="empty-state">${t('no_alerts')}</div>`; return; }
+  el.innerHTML = list.slice(0,8).map(a => {
+    const sev = a.severity;
+    const col = sev === 'extreme' ? 'var(--red)' : (sev === 'severe' ? 'var(--orange)' : 'var(--accent-1)');
+    const dir = a.anomaly_type === 'spike' ? t('spike') : t('drop');
+    return `<div style="background:var(--bg-card);border:1px solid var(--border);border-left:3px solid ${col};border-radius:10px;padding:14px">
+      <div style="font-weight:700;font-size:0.8rem;margin-bottom:4px">${a.zone_name}</div>
+      <div style="font-size:0.7rem;color:var(--text-2)">${dir} · z=${parseFloat(a.z_score).toFixed(1)} · ${sev}</div>
+      <div style="font-size:0.68rem;color:var(--text-3);margin-top:3px">
+        ${t('now') || 'Now'}: ${parseFloat(a.current_rate).toFixed(1)}/day vs avg ${parseFloat(a.baseline_rate).toFixed(1)}/day
+      </div>
+      <button class="ack-btn" onclick="ackAnomaly(${a.id})">${t('ack')}</button>
+    </div>`;
+  }).join('');
+}
+
+function renderForecasts(list) {
+  const el = document.getElementById('forecast-grid');
+  if (!list?.length) { el.innerHTML = `<div class="empty-state">${t('loading')}</div>`; return; }
+
+  const byOffset = {};
+  list.forEach(f => {
+    if (!byOffset[f.hour_offset]) byOffset[f.hour_offset] = [];
+    byOffset[f.hour_offset].push(f);
+  });
+
+  el.innerHTML = Object.entries(byOffset).map(([off, items]) => {
+    const time = (items[0].target_datetime || '').slice(11,16);
+    const itemsHtml = items.slice(0,5).map(f => {
+      const p = parseFloat(f.predicted_violations);
+      const cls = p >= 20 ? 'high' : (p >= 10 ? 'med' : 'low');
+      
+      let llmHtml = '';
+      if (f.validation_status) {
+        const valCol = f.validation_status === 'Valid' ? 'var(--green)' : 'var(--orange)';
+        const icon   = f.validation_status === 'Valid' ? '✓' : '⚠️';
+        llmHtml = `
+          <div style="font-size:0.65rem; margin-top:4px; padding:4px 6px; background:rgba(0,0,0,0.2); border-left:2px solid ${valCol}; border-radius:4px; line-height:1.3;">
+            <strong style="color:${valCol}">${icon} ${f.validation_status}</strong>: <span style="color:var(--text-2)">${f.llm_rationale}</span>
+          </div>
+        `;
+      }
+
+      return `<div class="forecast-item" style="flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; align-items:center; gap:10px; width:100%;">
+          <div class="forecast-badge ${cls}">${p.toFixed(0)}</div>
+          <div class="forecast-name" style="font-weight:600;">${f.zone_name}</div>
+        </div>
+        ${llmHtml}
+      </div>`;
+    }).join('');
+    return `<div class="forecast-card">
+      <div class="forecast-card-title">${t('in_x_hour',{n:off,t:time})}</div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderDeploy(list) {
+  const el = document.getElementById('deploy-grid');
+  if (!list?.length) { el.innerHTML = `<div class="empty-state">${t('loading')}</div>`; return; }
+  el.innerHTML = list.slice(0,6).map(d => {
+    const zonesHtml = (d.top_zones||[]).map(z =>
+      `<div class="deploy-zone-item">${z.zone_name} (${parseFloat(z.total_pred).toFixed(0)})</div>`
+    ).join('');
+    return `<div class="deploy-card">
+      <div class="deploy-station">${d.police_station}</div>
+      <div class="deploy-patrols">${d.recommended_patrols}</div>
+      <div class="deploy-patrols-label">${t('patrol_unit')}</div>
+      <div style="font-size:0.7rem;color:var(--text-3);margin-top:4px">${Math.round(d.total_predicted)} ${t('expected')}</div>
+      <div class="deploy-zones" style="margin-top:10px">
+        <div style="font-size:0.68rem;color:var(--text-3);margin-bottom:4px">${t('zones_for')}:</div>
+        ${zonesHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderZonesTable(zones) {
+  const el = document.getElementById('zones-tbody');
+  if (!zones?.length) { el.innerHTML = `<tr><td colspan="7" class="empty-state">${t('loading')}</td></tr>`; return; }
+  el.innerHTML = zones.slice(0,25).map(z => `
+    <tr>
+      <td>${z.zone_name}</td>
+      <td><b>${z.congestion_score}</b></td>
+      <td><span class="tier-badge tier-${z.risk_tier}">${z.risk_tier}</span></td>
+      <td>${z.violation_count?.toLocaleString()}</td>
+      <td>${z.daily_rate}/day</td>
+      <td>${z.blockage_pct}%</td>
+      <td>${z.police_station}</td>
+    </tr>`).join('');
+}
+
+async function loadScoreChart() {
+  const data = await fetchJSON(`${API}/api/score-history`);
+  if (!data?.length) return;
+
+  // Group by zone
+  const byZone = {};
+  data.forEach(r => {
+    if (!byZone[r.zone_name]) byZone[r.zone_name] = { times:[], scores:[] };
+    byZone[r.zone_name].times.push(r.recalculated_at.slice(11,16));
+    byZone[r.zone_name].scores.push(r.congestion_score);
+  });
+
+  const colors = ['#38bdf8','#818cf8','#c084fc','#ef4444','#22c55e'];
+  const datasets = Object.entries(byZone).map(([name, d], i) => ({
+    label: name, data: d.scores,
+    borderColor: colors[i % colors.length],
+    backgroundColor: colors[i % colors.length] + '20',
+    tension: 0.4, pointRadius: 3,
+  }));
+
+  const labels = Object.values(byZone)[0]?.times || [];
+
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color:'#94a3b8', font:{family:'Outfit',size:11} } }
+      },
+      scales: {
+        x: { ticks:{color:'#475569'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: { ticks:{color:'#475569'}, grid:{color:'rgba(255,255,255,0.04)'}, min:0, max:100 }
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+//  INTERACTIONS
+// ════════════════════════════════════════════
+async function ackAlert(id) {
+  await fetch(`${API}/api/alerts/${id}/ack`, {method:'POST'});
+  state.alerts = state.alerts.map(a => a.id === id ? {...a, acknowledged:1} : a);
+  renderAlerts(state.alerts);
+  state.kpis.unacked_alerts = Math.max(0, (state.kpis.unacked_alerts||1) - 1);
+  renderKPIs(state.kpis);
+}
+async function ackAnomaly(id) {
+  await fetch(`${API}/api/anomalies/${id}/ack`, {method:'POST'});
+  state.anomalies = state.anomalies.filter(a => a.id !== id);
+  renderAnomalies(state.anomalies);
+}
+
+function setHeatmapMode(mode) {
+  heatmapMode = mode;
+  document.getElementById('mode-vol').classList.toggle('active', mode === 'volume');
+  document.getElementById('mode-imp').classList.toggle('active', mode === 'impact');
+  buildHeatmap();
+}
+
+function applyFilters() { buildMap(); buildHeatmap(); }
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'data') setTimeout(() => map.invalidateSize(), 50);
+}
+
+// ════════════════════════════════════════════
+//  BOOTSTRAP
+// ════════════════════════════════════════════
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
