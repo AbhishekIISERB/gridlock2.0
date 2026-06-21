@@ -1,0 +1,80 @@
+[
+  {
+    "police_station": "HAL Old Airport",
+    "total_predicted": 25.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "HAL Old Airport area",
+        "total_pred": 25.2
+      }
+    ]
+  },
+  {
+    "police_station": "HSR Layout",
+    "total_predicted": 24.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "HSR Layout area",
+        "total_pred": 24.0
+      }
+    ]
+  },
+  {
+    "police_station": "Jeevanbheemanagar",
+    "total_predicted": 24.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "17th Main, Doopanahalli Bus Stop",
+        "total_pred": 12.1
+      },
+      {
+        "zone_name": "Jeevanbheemanagar area",
+        "total_pred": 12.0
+      }
+    ]
+  },
+  {
+    "police_station": "Kodigehalli",
+    "total_predicted": 24.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "Kodigehalli area",
+        "total_pred": 24.299999999999997
+      }
+    ]
+  },
+  {
+    "police_station": "Bellandur",
+    "total_predicted": 21.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "Bellandur area",
+        "total_pred": 21.0
+      }
+    ]
+  },
+  {
+    "police_station": "Mico Layout",
+    "total_predicted": 21.0,
+    "recommended_patrols": 1,
+    "top_zones": [
+      {
+        "zone_name": "16th Main Road, BTM Layout",
+        "total_pred": 6.0
+      },
+      {
+        "zone_name": "Hosur-Tavarkere Road Junction",
+        "total_pred": 6.0
+      },
+      {
+        "zone_name": "Dairy Circle",
+        "total_pred": 3.0
+      }
+    ]
+  }
+]

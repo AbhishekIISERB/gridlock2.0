@@ -1,0 +1,11 @@
+{
+  "active_clusters": 184,
+  "critical_zones": 7,
+  "high_zones": 44,
+  "medium_zones": 100,
+  "unacked_alerts": 0,
+  "anomalies": 0,
+  "total_ingested": 254085,
+  "last_ingested": "2024-04-08 17:30:46",
+  "refresh_ts": "2026-06-21T13:17:11.477315"
+}

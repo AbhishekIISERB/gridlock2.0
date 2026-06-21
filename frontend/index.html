@@ -672,7 +672,9 @@ function setLang(l) {
 //  STATE
 // ════════════════════════════════════════════
 const state = { zones:[], alerts:[], anomalies:[], forecasts:[], deploy:[], kpis:{} };
-const API = 'http://localhost:8502';
+const IS_STATIC = true;  // Set to true to read from static JSON files (Vercel mode)
+const API = IS_STATIC ? '.' : '';
+const EXT = IS_STATIC ? '.json' : '';
 let heatLayer = null, zoneLayerGroup = null, poiLayerGroup = null;
 let chartInst = null;
 let heatmapMode = 'volume';
@@ -783,12 +785,12 @@ async function fetchJSON(url) {
 
 async function loadAll() {
   const [kpis, zones, alerts, anomalies, forecasts, deploy] = await Promise.all([
-    fetchJSON(`${API}/api/kpis`),
-    fetchJSON(`${API}/api/zones`),
-    fetchJSON(`${API}/api/alerts`),
-    fetchJSON(`${API}/api/anomalies`),
-    fetchJSON(`${API}/api/forecasts`),
-    fetchJSON(`${API}/api/deployment`),
+    fetchJSON(`${API}/api/kpis${EXT}`),
+    fetchJSON(`${API}/api/zones${EXT}`),
+    fetchJSON(`${API}/api/alerts${EXT}`),
+    fetchJSON(`${API}/api/anomalies${EXT}`),
+    fetchJSON(`${API}/api/forecasts${EXT}`),
+    fetchJSON(`${API}/api/deployment${EXT}`),
   ]);
 
   if (kpis)      { state.kpis = kpis; renderKPIs(kpis); }
@@ -925,7 +927,7 @@ function renderZonesTable(zones) {
 }
 
 async function loadScoreChart() {
-  const data = await fetchJSON(`${API}/api/score-history`);
+  const data = await fetchJSON(`${API}/api/score-history${EXT}`);
   if (!data?.length) return;
 
   // Group by zone
