@@ -756,7 +756,13 @@ async function buildHeatmap() {
   if (!showHeat) return;
 
   const hours = document.getElementById('hours-slider').value;
-  const data  = await fetchJSON(`${API}/api/heatmap?hours=${hours}&mode=${heatmapMode}`);
+  
+  let url = `${API}/api/heatmap?hours=${hours}&mode=${heatmapMode}`;
+  if (IS_STATIC) {
+    url = `${API}/api/heatmap_${heatmapMode}${EXT}`;
+  }
+  
+  const data  = await fetchJSON(url);
   if (!data?.points?.length) return;
 
   const gradients = {
