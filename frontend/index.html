@@ -294,7 +294,7 @@
     .deploy-patrols-label { font-size: 0.65rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 1px; }
     .deploy-zones { margin-top: 10px; }
     .deploy-zone-item { font-size: 0.72rem; color: var(--text-2); padding: 3px 0; display: flex; align-items: center; gap: 6px; }
-    .deploy-zone-item::before { content: '📍'; font-size: 0.7rem; }
+    .deploy-zone-item::before { content: '•'; font-size: 0.7rem; }
 
     /* Zone table */
     .zone-table-wrap { overflow-x: auto; margin-top: 12px; }
@@ -394,8 +394,8 @@
       <div style="height:14px"></div>
       <label class="filter-label" data-i18n="heatmap_mode">Heatmap Mode</label>
       <div class="heatmap-radios">
-        <button class="heatmap-radio-btn active" id="mode-vol" onclick="setHeatmapMode('volume')" data-i18n="vol_mode">📊 Violation Volume</button>
-        <button class="heatmap-radio-btn"        id="mode-imp" onclick="setHeatmapMode('impact')" data-i18n="imp_mode">🚨 Congestion Impact</button>
+        <button class="heatmap-radio-btn active" id="mode-vol" onclick="setHeatmapMode('volume')" data-i18n="vol_mode"> Violation Volume</button>
+        <button class="heatmap-radio-btn"        id="mode-imp" onclick="setHeatmapMode('impact')" data-i18n="imp_mode"> Congestion Impact</button>
       </div>
 
       <div style="height:14px"></div>
@@ -466,10 +466,10 @@
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('live')"    data-i18n="tab_live">🗺️ Live Operations</button>
-      <button class="tab-btn"        onclick="switchTab('deploy')"  data-i18n="tab_deploy">🚔 Deployment Plan</button>
-      <button class="tab-btn"        onclick="switchTab('predict')" data-i18n="tab_predict">🔮 AI Predictions</button>
-      <button class="tab-btn"        onclick="switchTab('data')"    data-i18n="tab_data">📊 Analytics</button>
+      <button class="tab-btn active" onclick="switchTab('live')"    data-i18n="tab_live"> Live Operations</button>
+      <button class="tab-btn"        onclick="switchTab('deploy')"  data-i18n="tab_deploy"> Deployment Plan</button>
+      <button class="tab-btn"        onclick="switchTab('predict')" data-i18n="tab_predict"> AI Predictions</button>
+      <button class="tab-btn"        onclick="switchTab('data')"    data-i18n="tab_data"> Analytics</button>
     </div>
 
     <!-- ─── TAB: Live Operations ─── -->
@@ -478,7 +478,7 @@
         <div id="map"></div>
 
         <div class="section-header" style="margin-top:20px">
-          <h2>⚠️ <span data-i18n="anomaly_header">Statistical Anomalies</span></h2>
+          <h2> <span data-i18n="anomaly_header">Statistical Anomalies</span></h2>
         </div>
         <div id="anomaly-list" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px;">
           <div class="empty-state" data-i18n="loading">Loading...</div>
@@ -489,7 +489,7 @@
       <div id="tab-deploy" class="tab-panel">
         <div class="section-header">
           <div>
-            <h2>🚔 <span data-i18n="deploy_header">Actionable Patrol Deployment (Next 3 Hours)</span></h2>
+            <h2> <span data-i18n="deploy_header">Actionable Patrol Deployment (Next 3 Hours)</span></h2>
             <p data-i18n="deploy_sub">Recommended patrols based on AI violation forecast · 1 patrol per 15 expected violations</p>
           </div>
         </div>
@@ -502,8 +502,16 @@
       <div id="tab-predict" class="tab-panel">
         <div class="section-header">
           <div>
-            <h2>🔮 <span data-i18n="predict_header">Next-Shift Hotspot Predictions</span></h2>
+            <h2> <span data-i18n="predict_header">Next-Shift Hotspot Predictions</span></h2>
             <p data-i18n="predict_sub" style="line-height:1.4; opacity:0.9; margin-top:4px;">Prioritized hit-list: Tells police exactly how many violations to expect, where they will happen, and which areas need patrols sent first.</p>
+        <div style="margin-top:12px; padding:16px; background:rgba(56,189,248,0.1); border:2px solid var(--accent-1); border-radius:10px;">
+          <div style="font-size:1.2rem; font-weight:800; color:var(--accent-1); margin-bottom:6px;">DATA AGGREGATION NOTICE</div>
+          <p style="font-size:0.9rem; color:var(--text-1); line-height:1.5;">
+            <strong>Why do these top hotspots differ from the Deployment Plan?</strong><br>
+            This <strong>AI Predictions</strong> tab shows the top individual <em>hotspots (zones)</em> across the city per hour.<br>
+            The <strong>Deployment Plan</strong> tab aggregates violations across <em>entire Police Station jurisdictions</em> over 3 hours. A station with many small hotspots will rank highest there, even if its individual zones don't make this top 5 list!
+          </p>
+        </div>
           </div>
         </div>
         <div class="forecast-grid" id="forecast-grid">
@@ -514,12 +522,12 @@
       <!-- ─── TAB: Analytics ─── -->
       <div id="tab-data" class="tab-panel">
         <div class="section-header">
-          <h2>📈 <span data-i18n="analytics_header">Score Trends — Top 5 Zones</span></h2>
+          <h2> <span data-i18n="analytics_header">Score Trends — Top 5 Zones</span></h2>
         </div>
         <canvas id="scoreChart"></canvas>
 
         <div class="section-header" style="margin-top:28px">
-          <h2>🏆 <span data-i18n="rankings_header">Current Zone Rankings</span></h2>
+          <h2> <span data-i18n="rankings_header">Current Zone Rankings</span></h2>
         </div>
         <div class="zone-table-wrap">
           <table>
@@ -556,8 +564,8 @@ const T = {
     filters:        "Filters",
     hours_filter:   "Hours to show:",
     heatmap_mode:   "Heatmap Mode",
-    vol_mode:       "📊 Violation Volume",
-    imp_mode:       "🚨 Congestion Impact",
+    vol_mode:       " Violation Volume",
+    imp_mode:       " Congestion Impact",
     show_heatmap:   "Show Heatmap",
     show_zones:     "Show Zone Markers",
     show_pois:      "Show POIs",
@@ -574,10 +582,10 @@ const T = {
     kpi_ingested:   "Violations Ingested",
     kpi_alerts:     "Unacked Alerts",
     kpi_alerts_sub: "Needs attention",
-    tab_live:       "🗺️ Live Operations",
-    tab_deploy:     "🚔 Deployment Plan",
-    tab_predict:    "🔮 AI Predictions",
-    tab_data:       "📊 Analytics",
+    tab_live:       " Live Operations",
+    tab_deploy:     " Deployment Plan",
+    tab_predict:    " AI Predictions",
+    tab_data:       " Analytics",
     anomaly_header: "Statistical Anomalies",
     deploy_header:  "Actionable Patrol Deployment (Next 3 Hours)",
     deploy_sub:     "Recommended patrols · 1 patrol per 15 expected violations",
@@ -589,7 +597,7 @@ const T = {
     th_violations:  "Violations", th_rate: "Daily Rate",
     th_blockage:    "Blockage %", th_station: "Station",
     patrol_unit:    "patrol(s) recommended",
-    no_alerts:      "✅ No active alerts",
+    no_alerts:      " No active alerts",
     loading:        "Loading...",
     expected:       "violations expected",
     in_x_hour:      "In {n} hour(s) — {t}",
@@ -604,8 +612,8 @@ const T = {
     filters:        "ಫಿಲ್ಟರ್‌ಗಳು",
     hours_filter:   "ತೋರಿಸಲು ಗಂಟೆಗಳು:",
     heatmap_mode:   "ಶಾಖನಕ್ಷೆ ಮೋಡ್",
-    vol_mode:       "📊 ಉಲ್ಲಂಘನೆ ಪ್ರಮಾಣ",
-    imp_mode:       "🚨 ದಟ್ಟಣೆ ಪ್ರಭಾವ",
+    vol_mode:       " ಉಲ್ಲಂಘನೆ ಪ್ರಮಾಣ",
+    imp_mode:       " ದಟ್ಟಣೆ ಪ್ರಭಾವ",
     show_heatmap:   "ಶಾಖನಕ್ಷೆ ತೋರಿಸಿ",
     show_zones:     "ವಲಯ ಗುರುತುಗಳು",
     show_pois:      "POI ತೋರಿಸಿ",
@@ -622,10 +630,10 @@ const T = {
     kpi_ingested:   "ಉಲ್ಲಂಘನೆಗಳು ನೋಂದಾಯಿಸಲಾಗಿದೆ",
     kpi_alerts:     "ಬಾಕಿ ಎಚ್ಚರಿಕೆಗಳು",
     kpi_alerts_sub: "ಗಮನ ಅಗತ್ಯ",
-    tab_live:       "🗺️ ನೇರ ಕಾರ್ಯಾಚರಣೆ",
-    tab_deploy:     "🚔 ನಿಯೋಜನೆ ಯೋಜನೆ",
-    tab_predict:    "🔮 AI ಭವಿಷ್ಯ",
-    tab_data:       "📊 ವಿಶ್ಲೇಷಣೆ",
+    tab_live:       " ನೇರ ಕಾರ್ಯಾಚರಣೆ",
+    tab_deploy:     " ನಿಯೋಜನೆ ಯೋಜನೆ",
+    tab_predict:    " AI ಭವಿಷ್ಯ",
+    tab_data:       " ವಿಶ್ಲೇಷಣೆ",
     anomaly_header: "ಅಸಾಮಾನ್ಯ ಚಟುವಟಿಕೆಗಳು",
     deploy_header:  "ಗಸ್ತು ನಿಯೋಜನೆ (ಮುಂದಿನ 3 ಗಂಟೆ)",
     deploy_sub:     "AI ಮುನ್ಸೂಚನೆ ಆಧಾರದ ಗಸ್ತು",
@@ -637,7 +645,7 @@ const T = {
     th_violations:  "ಉಲ್ಲಂಘನೆಗಳು", th_rate: "ದೈನಿಕ ದರ",
     th_blockage:    "ತಡೆ %", th_station: "ಠಾಣೆ",
     patrol_unit:    "ಗಸ್ತು(ಗಳು) ಶಿಫಾರಸು",
-    no_alerts:      "✅ ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ",
+    no_alerts:      " ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ",
     loading:        "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
     expected:       "ಉಲ್ಲಂಘನೆಗಳು ನಿರೀಕ್ಷಿತ",
     in_x_hour:      "{n} ಗಂಟೆಯಲ್ಲಿ — {t}",
@@ -691,13 +699,13 @@ zoneLayerGroup = L.layerGroup().addTo(map);
 poiLayerGroup  = L.layerGroup().addTo(map);
 
 const POIS = [
-  {name:"Indiranagar Metro", lat:12.9783, lon:77.6387, icon:"🚇"},
-  {name:"MG Road Metro",     lat:12.9755, lon:77.6068, icon:"🚇"},
-  {name:"Majestic Bus/Metro",lat:12.9757, lon:77.5729, icon:"🚇"},
-  {name:"Manyata Tech Park", lat:13.0450, lon:77.6206, icon:"🏢"},
-  {name:"Ecospace Tech Park",lat:12.9248, lon:77.6806, icon:"🏢"},
-  {name:"KR Market",         lat:12.9634, lon:77.5760, icon:"🛒"},
-  {name:"Koramangala BDA",   lat:12.9284, lon:77.6262, icon:"🛒"},
+  {name:"Indiranagar Metro", lat:12.9783, lon:77.6387, icon:"•"},
+  {name:"MG Road Metro",     lat:12.9755, lon:77.6068, icon:"•"},
+  {name:"Majestic Bus/Metro",lat:12.9757, lon:77.5729, icon:"•"},
+  {name:"Manyata Tech Park", lat:13.0450, lon:77.6206, icon:"•"},
+  {name:"Ecospace Tech Park",lat:12.9248, lon:77.6806, icon:"•"},
+  {name:"KR Market",         lat:12.9634, lon:77.5760, icon:"•"},
+  {name:"Koramangala BDA",   lat:12.9284, lon:77.6262, icon:"•"},
 ];
 
 function scoreColor(s) {
@@ -874,7 +882,7 @@ function renderForecasts(list) {
       let llmHtml = '';
       if (f.validation_status) {
         const valCol = f.validation_status === 'Valid' ? 'var(--green)' : 'var(--orange)';
-        const icon   = f.validation_status === 'Valid' ? '✓' : '⚠️';
+        const icon   = f.validation_status === 'Valid' ? '✓' : '';
         llmHtml = `
           <div style="font-size:0.65rem; margin-top:4px; padding:4px 6px; background:rgba(0,0,0,0.2); border-left:2px solid ${valCol}; border-radius:4px; line-height:1.3;">
             <strong style="color:${valCol}">${icon} ${f.validation_status}</strong>: <span style="color:var(--text-2)">${f.llm_rationale}</span>
