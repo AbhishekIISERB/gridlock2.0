@@ -1,79 +1,79 @@
 [
   {
-    "police_station": "HAL Old Airport",
-    "total_predicted": 25.0,
-    "recommended_patrols": 1,
+    "police_station": "Mahadevapura",
+    "total_predicted": 94.0,
+    "recommended_patrols": 6,
     "top_zones": [
       {
-        "zone_name": "HAL Old Airport area",
-        "total_pred": 25.2
-      }
-    ]
-  },
-  {
-    "police_station": "HSR Layout",
-    "total_predicted": 24.0,
-    "recommended_patrols": 1,
-    "top_zones": [
-      {
-        "zone_name": "HSR Layout area",
-        "total_pred": 24.0
-      }
-    ]
-  },
-  {
-    "police_station": "Jeevanbheemanagar",
-    "total_predicted": 24.0,
-    "recommended_patrols": 1,
-    "top_zones": [
-      {
-        "zone_name": "17th Main, Doopanahalli Bus Stop",
-        "total_pred": 12.1
-      },
-      {
-        "zone_name": "Jeevanbheemanagar area",
-        "total_pred": 12.0
+        "zone_name": "Mahadevapura area",
+        "total_pred": 93.8
       }
     ]
   },
   {
     "police_station": "Kodigehalli",
-    "total_predicted": 24.0,
-    "recommended_patrols": 1,
+    "total_predicted": 73.0,
+    "recommended_patrols": 4,
     "top_zones": [
       {
         "zone_name": "Kodigehalli area",
-        "total_pred": 24.299999999999997
+        "total_pred": 73.1
       }
     ]
   },
   {
-    "police_station": "Bellandur",
-    "total_predicted": 21.0,
-    "recommended_patrols": 1,
+    "police_station": "Adugodi",
+    "total_predicted": 63.0,
+    "recommended_patrols": 4,
     "top_zones": [
       {
-        "zone_name": "Bellandur area",
-        "total_pred": 21.0
+        "zone_name": "Adugodi area",
+        "total_pred": 58.599999999999994
+      },
+      {
+        "zone_name": "UCO Bank Junction",
+        "total_pred": 4.3
       }
     ]
   },
   {
-    "police_station": "Mico Layout",
-    "total_predicted": 21.0,
-    "recommended_patrols": 1,
+    "police_station": "Pulikeshinagar(F.Town)",
+    "total_predicted": 48.0,
+    "recommended_patrols": 3,
     "top_zones": [
       {
-        "zone_name": "16th Main Road, BTM Layout",
-        "total_pred": 6.0
+        "zone_name": "Pulikeshinagar(F.Town) area",
+        "total_pred": 48.1
+      }
+    ]
+  },
+  {
+    "police_station": "Byatarayanapura",
+    "total_predicted": 44.0,
+    "recommended_patrols": 2,
+    "top_zones": [
+      {
+        "zone_name": "Nayandahalli Junction",
+        "total_pred": 17.8
       },
       {
-        "zone_name": "Hosur-Tavarkere Road Junction",
-        "total_pred": 6.0
+        "zone_name": "Byatarayanapura area",
+        "total_pred": 14.6
       },
       {
-        "zone_name": "Dairy Circle",
-        "total_pred": 3.0
+        "zone_name": "Attiguppe Circle",
+        "total_pred": 6.5
+      }
+    ]
+  },
+  {
+    "police_station": "Electronic City",
+    "total_predicted": 44.0,
+    "recommended_patrols": 2,
+    "top_zones": [
+      {
+        "zone_name": "Electronic City area",
+        "total_pred": 43.5
       }
     ]
   }
